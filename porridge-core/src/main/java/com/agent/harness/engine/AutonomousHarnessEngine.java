@@ -152,19 +152,35 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
             }
             
             UserMessage userMessage;
-            if (prompt.trim().startsWith("/image ")) {
-                String[] imageParts = prompt.trim().substring(7).trim().split(" ", 2);
-                if (imageParts.length < 2) {
-                    terminal.writer().println("\u001B[31m[SYSTEM] Usage: /image <path> <prompt>\u001B[0m");
+            if (prompt.trim().startsWith("/image ") || prompt.trim().startsWith("/media ")) {
+                String cmd = prompt.trim().startsWith("/image ") ? "/image " : "/media ";
+                String[] mediaParts = prompt.trim().substring(cmd.length()).trim().split(" ", 2);
+                if (mediaParts.length < 2) {
+                    terminal.writer().println("\u001B[31m[SYSTEM] Usage: " + cmd + "<path> <prompt>\u001B[0m");
                     continue;
                 }
                 try {
-                    byte[] imgBytes = Files.readAllBytes(Path.of(imageParts[0]));
-                    MimeType mimeType = imageParts[0].endsWith(".png") ? MimeTypeUtils.IMAGE_PNG : MimeTypeUtils.IMAGE_JPEG;
-                    Media media = new Media(mimeType, new ByteArrayResource(imgBytes));
-                    userMessage = new UserMessage(evaluationContext + "### User Goal:\n" + imageParts[1], List.of(media));
+                    String filePath = mediaParts[0];
+                    byte[] fileBytes = Files.readAllBytes(Path.of(filePath));
+                    
+                    String mimeStr = "application/octet-stream";
+                    String lowerPath = filePath.toLowerCase();
+                    if (lowerPath.endsWith(".png")) mimeStr = "image/png";
+                    else if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg")) mimeStr = "image/jpeg";
+                    else if (lowerPath.endsWith(".gif")) mimeStr = "image/gif";
+                    else if (lowerPath.endsWith(".webp")) mimeStr = "image/webp";
+                    else if (lowerPath.endsWith(".mp4")) mimeStr = "video/mp4";
+                    else if (lowerPath.endsWith(".mpeg")) mimeStr = "video/mpeg";
+                    else if (lowerPath.endsWith(".mov")) mimeStr = "video/quicktime";
+                    else if (lowerPath.endsWith(".mp3")) mimeStr = "audio/mpeg";
+                    else if (lowerPath.endsWith(".wav")) mimeStr = "audio/wav";
+                    else if (lowerPath.endsWith(".ogg")) mimeStr = "audio/ogg";
+                    
+                    MimeType mimeType = MimeType.valueOf(mimeStr);
+                    Media media = new Media(mimeType, new ByteArrayResource(fileBytes));
+                    userMessage = new UserMessage(evaluationContext + "### User Goal:\n" + mediaParts[1], List.of(media));
                 } catch (Exception e) {
-                    terminal.writer().println("\u001B[31m[SYSTEM] Failed to load image: " + e.getMessage() + "\u001B[0m");
+                    terminal.writer().println("\u001B[31m[SYSTEM] Failed to load media: " + e.getMessage() + "\u001B[0m");
                     continue;
                 }
             } else {
