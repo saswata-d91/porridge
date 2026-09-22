@@ -205,7 +205,7 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                 String cliCmd = "";
                 
                 if (engine.equalsIgnoreCase("agy")) {
-                    cliCmd = "agy --goal \"" + prompt.replace("\"", "\\\"") + "\"" + (!extModel.equals("default") ? " --model " + extModel : "");
+                    cliCmd = "agy --print \"" + prompt.replace("\"", "\\\"") + "\"" + (!extModel.equals("default") ? " --model " + extModel : "");
                 } else if (engine.equalsIgnoreCase("claude-code") || engine.equalsIgnoreCase("claude")) {
                     // Claude Code accepts model via environment variables usually, but we can try --model if they ever add it, or just pass nothing.
                     cliCmd = "claude -p \"" + prompt.replace("\"", "\\\"") + "\"" + (!extModel.equals("default") ? " -m " + extModel : "");

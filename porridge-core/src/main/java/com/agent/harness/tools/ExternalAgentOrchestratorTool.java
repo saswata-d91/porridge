@@ -24,7 +24,7 @@ public class ExternalAgentOrchestratorTool {
                     case "agy":
                     case "antigravity":
                         // agy requires --goal for headless autonomous execution
-                        cmd = "agy --goal \"" + req.prompt().replace("\"", "\\\"") + "\"";
+                        cmd = "agy --print \"" + req.prompt().replace("\"", "\\\"") + "\"";
                         break;
                     case "claude":
                     case "claude-code":
