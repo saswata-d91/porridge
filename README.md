@@ -40,6 +40,23 @@ Porridge includes interactive menus for configuring your execution environment:
 
 Simply type `/engine agy` in the REPL, and Porridge will securely pipe prompts to the external CLI while retaining full context history and sandbox virtualization.
 
+
+## 🖼️ Multimodality & File Management
+
+Porridge treats files and binary data as first-class citizens:
+
+### 1. Native Image, Audio, and Video Parsing
+You can stream binary media directly into the LLM context window using the `/media` (or `/image`) slash command. If your underlying model supports it (like Gemini 1.5 Pro), Porridge will wrap the binary in a Spring AI `Media` payload, allowing the model to natively "watch", "listen", or "see" the file.
+**Usage:** `/media path/to/recording.mp4 Summarize this meeting.`
+**Supported Formats:** `.png`, `.jpg`, `.mp4`, `.mp3`, `.wav`, etc.
+
+### 2. Deep Document Parsing (Apache Tika)
+Agents have access to a native `ReadDocumentTool` powered by embedded **Apache Tika**. If you ask Porridge to read a PDF, Excel Spreadsheet (`.xlsx`), Word Document (`.docx`), or PowerPoint, it will automatically parse the binary and extract the readable text for the context window.
+
+### 3. Conversation-Isolated Artifacts
+When drafting complex plans or generating reports, Porridge automatically silos generated artifacts into isolated directories grouped by the active conversation session (e.g., `.porridge/conversations/<sessionId>`). This keeps your root project clean across different agent threads.
+*Configure this via `application.properties`:* `porridge.artifacts-dir=.porridge/conversations`
+
 ## 🧩 Extensibility: Skills, Tools, and MCP Servers
 
 Porridge is designed to be deeply extensible. It recursively scans your directory tree to dynamically load knowledge and capabilities.
