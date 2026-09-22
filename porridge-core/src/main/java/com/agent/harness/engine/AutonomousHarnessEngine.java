@@ -1,21 +1,28 @@
 package com.agent.harness.engine;
-import java.nio.file.StandardOpenOption;
-import org.springframework.util.MimeTypeUtils;
-
-
 import com.agent.harness.config.HarnessState;
 import com.agent.harness.config.WorkspaceContext;
+import com.agent.harness.memory.ContextPersistenceManager;
 import com.agent.harness.tools.DynamicWorkspaceLoader;
 import com.agent.harness.tools.McpConnectionManager;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.modelcontextprotocol.server.McpServer;
+import io.modelcontextprotocol.server.McpServerFeatures;
+import io.modelcontextprotocol.server.McpSyncServer;
+import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
+import io.modelcontextprotocol.spec.McpSchema;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-
-
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.InMemoryChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -23,30 +30,21 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.model.Media;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.stereotype.Component;
 import org.springframework.util.MimeType;
 
 
 
-import com.agent.harness.config.HarnessMemoryConfig;
-import com.agent.harness.memory.ContextPersistenceManager;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.memory.InMemoryChatMemory;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.stereotype.Component;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Scanner;
 
-import io.modelcontextprotocol.server.McpServer;
-import io.modelcontextprotocol.server.McpServerFeatures;
-import io.modelcontextprotocol.server.McpSyncServer;
-import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
-import io.modelcontextprotocol.spec.McpSchema;
-import com.fasterxml.jackson.databind.ObjectMapper;
+
+
+
+
+
 
 @Component
 public class AutonomousHarnessEngine implements CommandLineRunner {
@@ -58,7 +56,7 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
     private final McpConnectionManager mcpManager;
     private final HarnessState harnessState;
     private final SubagentManager subagentManager;
-    private final List<ToolCallback> mcpTools;
+    private List<ToolCallback> mcpTools;
 
     public AutonomousHarnessEngine(
             ChatClient.Builder clientBuilder, 
@@ -257,6 +255,24 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
         String cmd = parts[0].toLowerCase();
         
         switch (cmd) {
+            case "/mcp":
+                if (parts.length > 1) {
+                    String[] mcpArgs = parts[1].trim().split(" ", 2);
+                    if (mcpArgs[0].equalsIgnoreCase("auth") && mcpArgs.length > 1) {
+                        mcpManager.runAuthCommand(mcpArgs[1].trim());
+                    } else if (mcpArgs[0].equalsIgnoreCase("reload")) {
+                        terminal.writer().println("\u001B[33m[SYSTEM] Reloading all MCP servers...\u001B[0m");
+                    } else {
+                        terminal.writer().println("\u001B[31m[SYSTEM] Usage: /mcp auth <serverName> OR /mcp reload\u001B[0m");
+                        break;
+                    }
+                    mcpManager.closeAll();
+                    this.mcpTools = mcpManager.loadMcpTools();
+                    terminal.writer().println("\u001B[32m[SYSTEM] MCP Servers reloaded successfully.\u001B[0m");
+                } else {
+                    terminal.writer().println("\u001B[31m[SYSTEM] Usage: /mcp auth <serverName> OR /mcp reload\u001B[0m");
+                }
+                break;
             case "/wizard":
                 terminal.writer().println("\u001B[36m=== Configuration Wizard ===\u001B[0m");
                 terminal.writer().println("1) Add a new Skill (Markdown Instructions)");

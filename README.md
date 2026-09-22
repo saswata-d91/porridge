@@ -112,6 +112,8 @@ This skips the REPL and binds a standard MCP JSON-RPC listener over `stdio`. It 
 ## 🎮 Interactive REPL Commands
 Porridge is bundled with several powerful JLine3 slash commands to control the harness environment interactively:
 
+* `/mcp auth <server>`: Executes the `authCommand` defined in `mcp.json` for the given server interactively in the REPL, and automatically reloads all MCP connections.
+* `/mcp reload`: Gracefully shuts down and re-initializes all MCP subprocesses (useful after manually updating API keys in your configs).
 * `/wizard`: Launches an interactive configuration wizard to scaffold new Skills (Markdown) or configure new MCP Tool Servers without leaving the REPL.
 * `/engine [name]`: Switches the execution engine (e.g., `porridge`, `agy`, `claude-code`). If run without arguments, it opens an interactive selection menu.
 * `/model [name]`: Switches the current LLM. If run without arguments, it opens a dynamic menu based on your current engine.

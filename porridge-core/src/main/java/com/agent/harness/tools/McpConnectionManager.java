@@ -35,6 +35,45 @@ public class McpConnectionManager {
         System.getenv("APPDATA") != null ? System.getenv("APPDATA") + "/Claude/claude_desktop_config.json" : null // Claude Desktop Win
     };
 
+
+    public void closeAll() {
+        for (McpSyncClient client : activeClients) {
+            try {
+                client.closeGracefully();
+            } catch (Exception e) {
+                // Ignore
+            }
+        }
+        activeClients.clear();
+    }
+
+    public void runAuthCommand(String targetServerName) {
+        for (String configPath : CONFIG_PATHS) {
+            if (configPath == null) continue;
+            Path path = Path.of(configPath);
+            if (Files.exists(path)) {
+                try {
+                    JsonNode rootNode = objectMapper.readTree(path.toFile());
+                    JsonNode mcpServersNode = rootNode.path("mcpServers");
+                    if (mcpServersNode.isObject()) {
+                        JsonNode serverConfig = mcpServersNode.path(targetServerName);
+                        if (!serverConfig.isMissingNode() && serverConfig.has("authCommand")) {
+                            String authCmd = serverConfig.path("authCommand").asText();
+                            System.out.println("\n\u001B[33m[MCP] Running auth command for " + targetServerName + ": " + authCmd + "\u001B[0m");
+                            Process p = new ProcessBuilder("sh", "-c", authCmd)
+                                .inheritIO()
+                                .start();
+                            p.waitFor();
+                            System.out.println("\u001B[32m[MCP] Auth command finished.\u001B[0m\n");
+                            return;
+                        }
+                    }
+                } catch (Exception e) {}
+            }
+        }
+        System.out.println("\u001B[31m[MCP] No authCommand found for server: " + targetServerName + "\u001B[0m");
+    }
+
     public List<ToolCallback> loadMcpTools() {
         List<ToolCallback> allTools = new ArrayList<>();
         
