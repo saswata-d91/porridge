@@ -1,0 +1,4 @@
+com/agent/graphmemory/GraphMemoryTools.class
+com/agent/graphmemory/GraphMemoryTools$DeleteMemoryRequest.class
+com/agent/graphmemory/GraphMemoryTools$QueryMemoryRequest.class
+com/agent/graphmemory/GraphMemoryTools$AddMemoryRequest.class

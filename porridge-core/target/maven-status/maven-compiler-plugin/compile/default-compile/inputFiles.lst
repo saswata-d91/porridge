@@ -1,0 +1,11 @@
+/Users/sdutta/workdir/porridge/feature/1-0-init/porridge-core/src/main/java/com/agent/harness/ClaudeCodeJavaHarnessApplication.java
+/Users/sdutta/workdir/porridge/feature/1-0-init/porridge-core/src/main/java/com/agent/harness/config/HarnessMemoryConfig.java
+/Users/sdutta/workdir/porridge/feature/1-0-init/porridge-core/src/main/java/com/agent/harness/config/HarnessState.java
+/Users/sdutta/workdir/porridge/feature/1-0-init/porridge-core/src/main/java/com/agent/harness/config/WorkspaceContext.java
+/Users/sdutta/workdir/porridge/feature/1-0-init/porridge-core/src/main/java/com/agent/harness/engine/AutonomousHarnessEngine.java
+/Users/sdutta/workdir/porridge/feature/1-0-init/porridge-core/src/main/java/com/agent/harness/engine/SubagentManager.java
+/Users/sdutta/workdir/porridge/feature/1-0-init/porridge-core/src/main/java/com/agent/harness/memory/ContextPersistenceManager.java
+/Users/sdutta/workdir/porridge/feature/1-0-init/porridge-core/src/main/java/com/agent/harness/tools/DynamicWorkspaceLoader.java
+/Users/sdutta/workdir/porridge/feature/1-0-init/porridge-core/src/main/java/com/agent/harness/tools/ExternalAgentOrchestratorTool.java
+/Users/sdutta/workdir/porridge/feature/1-0-init/porridge-core/src/main/java/com/agent/harness/tools/McpConnectionManager.java
+/Users/sdutta/workdir/porridge/feature/1-0-init/porridge-core/src/main/java/com/agent/harness/tools/PorridgeTools.java

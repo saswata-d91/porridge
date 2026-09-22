@@ -1,0 +1,4 @@
+com/agent/harness/tools/ExternalAgentOrchestratorToolTest.class
+com/agent/harness/config/WorkspaceContextTest.class
+com/agent/harness/engine/AutonomousHarnessEngineFunctionalTest.class
+com/agent/harness/config/HarnessStateTest.class
