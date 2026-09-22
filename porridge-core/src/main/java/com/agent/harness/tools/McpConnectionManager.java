@@ -1,5 +1,8 @@
 package com.agent.harness.tools;
 
+import java.util.Arrays;
+import org.springframework.ai.tool.ToolCallback;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.client.McpClient;
@@ -32,8 +35,8 @@ public class McpConnectionManager {
         System.getenv("APPDATA") != null ? System.getenv("APPDATA") + "/Claude/claude_desktop_config.json" : null // Claude Desktop Win
     };
 
-    public List<org.springframework.ai.tool.ToolCallback> loadMcpTools() {
-        List<org.springframework.ai.tool.ToolCallback> allTools = new ArrayList<>();
+    public List<ToolCallback> loadMcpTools() {
+        List<ToolCallback> allTools = new ArrayList<>();
         
         for (String configPath : CONFIG_PATHS) {
             if (configPath == null) continue;
@@ -47,8 +50,8 @@ public class McpConnectionManager {
         return allTools;
     }
 
-    private List<org.springframework.ai.tool.ToolCallback> parseConfigAndConnect(Path configPath) {
-        List<org.springframework.ai.tool.ToolCallback> tools = new ArrayList<>();
+    private List<ToolCallback> parseConfigAndConnect(Path configPath) {
+        List<ToolCallback> tools = new ArrayList<>();
         try {
             JsonNode rootNode = objectMapper.readTree(configPath.toFile());
             JsonNode mcpServersNode = rootNode.path("mcpServers");
@@ -64,7 +67,7 @@ public class McpConnectionManager {
                     List<String> args = new ArrayList<>();
                     serverConfig.path("args").forEach(argNode -> args.add(argNode.asText()));
                     
-                    Map<String, String> env = new HashMap<>();
+                    Map<String, String> env = new HashMap<>(System.getenv());
                     JsonNode envNode = serverConfig.path("env");
                     if (envNode.isObject()) {
                         envNode.fields().forEachRemaining(e -> env.put(e.getKey(), e.getValue().asText()));
@@ -83,8 +86,8 @@ public class McpConnectionManager {
                         activeClients.add(client);
                         
                         SyncMcpToolCallbackProvider provider = new SyncMcpToolCallbackProvider(client);
-                        org.springframework.ai.tool.ToolCallback[] serverTools = provider.getToolCallbacks();
-                        tools.addAll(java.util.Arrays.asList(serverTools));
+                        ToolCallback[] serverTools = provider.getToolCallbacks();
+                        tools.addAll(Arrays.asList(serverTools));
                         System.out.println("[MCP] Connected to server: " + serverName + " (Loaded " + serverTools.length + " tools)");
                     } catch (Exception ex) {
                         System.err.println("[X] Failed to connect to MCP server: " + serverName + " - " + ex.getMessage());
