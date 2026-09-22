@@ -1,6 +1,7 @@
 package com.agent.harness.config;
 
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
 
 @Component
 public class HarnessState {
@@ -8,6 +9,14 @@ public class HarnessState {
     private boolean planMode = false;
     private String currentModel = "default";
     private String executionEngine = "porridge";
+
+    @Value("${porridge.artifacts-dir:.porridge/conversations}")
+    private String artifactsDir;
+
+    public String getArtifactsDir() {
+        return artifactsDir;
+    }
+
 
     public String getExecutionEngine() {
         return executionEngine;

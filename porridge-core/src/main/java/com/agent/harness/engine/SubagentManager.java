@@ -1,5 +1,12 @@
 package com.agent.harness.engine;
 
+import com.agent.harness.config.WorkspaceContext;
+import com.agent.harness.tools.DynamicWorkspaceLoader;
+import com.agent.harness.tools.McpConnectionManager;
+import com.agent.harness.config.HarnessState;
+import java.nio.file.Path;
+import java.util.List;
+
 import com.agent.harness.memory.ContextPersistenceManager;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -19,8 +26,9 @@ public class SubagentManager {
     private final ChatClient chatClient;
     private final InMemoryChatMemory memory;
     private final ContextPersistenceManager persistenceManager;
-    private final com.agent.harness.tools.DynamicWorkspaceLoader workspaceLoader;
-    private final java.util.List<ToolCallback> mcpTools;
+    private final DynamicWorkspaceLoader workspaceLoader;
+    private final List<ToolCallback> mcpTools;
+    private final HarnessState harnessState;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     public SubagentManager(
@@ -28,13 +36,14 @@ public class SubagentManager {
             MessageChatMemoryAdvisor memoryAdvisor,
             InMemoryChatMemory memory,
             ContextPersistenceManager persistenceManager,
-            com.agent.harness.tools.DynamicWorkspaceLoader workspaceLoader,
-            com.agent.harness.tools.McpConnectionManager mcpManager) {
+            DynamicWorkspaceLoader workspaceLoader,
+            McpConnectionManager mcpManager, HarnessState harnessState) {
         this.chatClient = clientBuilder.defaultAdvisors(memoryAdvisor).build();
         this.memory = memory;
         this.persistenceManager = persistenceManager;
         this.workspaceLoader = workspaceLoader;
         this.mcpTools = mcpManager.loadMcpTools();
+        this.harnessState = harnessState;
     }
 
     public String spawnSubagent(String prompt, String role, boolean sandbox) {
@@ -42,14 +51,14 @@ public class SubagentManager {
         System.out.println("\n[SYSTEM] Forking subagent [" + subagentId + "] as role: " + role + (sandbox ? " (SANDBOXED)" : ""));
         
         Callable<String> subagentTask = () -> {
-            java.nio.file.Path sandboxDir = null;
+            Path sandboxDir = null;
             if (sandbox) {
-                sandboxDir = java.nio.file.Path.of(".porridge/sandboxes/" + subagentId).toAbsolutePath();
+                sandboxDir = Path.of(".porridge/sandboxes/" + subagentId).toAbsolutePath();
                 try {
                     new ProcessBuilder("sh", "-c", "mkdir -p .porridge/sandboxes && git worktree add -b " + subagentId + " " + sandboxDir.toString())
                             .redirectErrorStream(true)
                             .start().waitFor();
-                    com.agent.harness.config.WorkspaceContext.setBaseDir(sandboxDir);
+                    WorkspaceContext.setBaseDir(sandboxDir);
                 } catch (Exception e) {
                     return "Sandbox initialization failed: " + e.getMessage();
                 }
@@ -59,12 +68,14 @@ public class SubagentManager {
                 persistenceManager.loadSessionFromDisk(subagentId, memory);
                 
                 String systemConstraints = workspaceLoader.gatherSkillsContext();
-                String evaluationContext = "### Role:\n" + role + "\n\n### Local Workspace Constraints:\n" + systemConstraints + "\n\n### User Goal:\n" + prompt;
+                String evaluationContext = "### Role:\n" + role + "\n\n### Local Workspace Constraints:\n" + systemConstraints;
+                evaluationContext += "\n\n### Artifacts & Plans Directory:\nWhen asked to generate plans, reports, or persistent artifacts, save them in the following conversation-specific directory: " + harnessState.getArtifactsDir() + "/" + subagentId + ". You must create this directory if it doesn't exist before saving files to it.";
+                evaluationContext += "\n\n### User Goal:\n" + prompt;
 
                 String agentResponse = this.chatClient.prompt()
                         .user(evaluationContext)
                         .advisors(ctx -> ctx.param(MessageChatMemoryAdvisor.CHAT_MEMORY_CONVERSATION_ID_KEY, subagentId))
-                        .functions("viewFileTool", "editFileTool", "replaceFileTool", "bashCommandTool", "grepSearchTool", "fetchUrlTool", "listDirectoryTool", "runBackgroundTaskTool", "checkTaskStatusTool", "addMemoryTool", "queryMemoryTool", "deleteMemoryTool", "orchestrateAgentTool")
+                        .functions("viewFileTool", "editFileTool", "readDocumentTool", "replaceFileTool", "bashCommandTool", "grepSearchTool", "fetchUrlTool", "listDirectoryTool", "runBackgroundTaskTool", "checkTaskStatusTool", "addMemoryTool", "queryMemoryTool", "deleteMemoryTool", "orchestrateAgentTool")
                         .functions(mcpTools.toArray(new ToolCallback[0]))
                         .call()
                         .content();
@@ -73,7 +84,7 @@ public class SubagentManager {
                 return agentResponse;
             } finally {
                 if (sandbox && sandboxDir != null) {
-                    com.agent.harness.config.WorkspaceContext.clear();
+                    WorkspaceContext.clear();
                     try {
                         new ProcessBuilder("git", "worktree", "remove", "-f", sandboxDir.toString()).start().waitFor();
                         new ProcessBuilder("git", "branch", "-D", subagentId).start().waitFor();

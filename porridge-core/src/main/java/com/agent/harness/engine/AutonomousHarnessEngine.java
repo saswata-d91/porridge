@@ -1,4 +1,33 @@
 package com.agent.harness.engine;
+import java.nio.file.StandardOpenOption;
+import org.springframework.util.MimeTypeUtils;
+
+
+import com.agent.harness.config.HarnessState;
+import com.agent.harness.config.WorkspaceContext;
+import com.agent.harness.tools.DynamicWorkspaceLoader;
+import com.agent.harness.tools.McpConnectionManager;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.model.Media;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.util.MimeType;
+
+
 
 import com.agent.harness.config.HarnessMemoryConfig;
 import com.agent.harness.memory.ContextPersistenceManager;
@@ -25,20 +54,20 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
     private final ChatClient chatClient;
     private final InMemoryChatMemory memory;
     private final ContextPersistenceManager persistenceManager;
-    private final com.agent.harness.tools.DynamicWorkspaceLoader workspaceLoader;
-    private final com.agent.harness.tools.McpConnectionManager mcpManager;
-    private final com.agent.harness.config.HarnessState harnessState;
+    private final DynamicWorkspaceLoader workspaceLoader;
+    private final McpConnectionManager mcpManager;
+    private final HarnessState harnessState;
     private final SubagentManager subagentManager;
-    private final java.util.List<org.springframework.ai.tool.ToolCallback> mcpTools;
+    private final List<ToolCallback> mcpTools;
 
     public AutonomousHarnessEngine(
             ChatClient.Builder clientBuilder, 
             MessageChatMemoryAdvisor memoryAdvisor,
             InMemoryChatMemory memory,
             ContextPersistenceManager persistenceManager,
-            com.agent.harness.tools.DynamicWorkspaceLoader workspaceLoader,
-            com.agent.harness.tools.McpConnectionManager mcpManager,
-            com.agent.harness.config.HarnessState harnessState,
+            DynamicWorkspaceLoader workspaceLoader,
+            McpConnectionManager mcpManager,
+            HarnessState harnessState,
             SubagentManager subagentManager) {
         
         this.memory = memory;
@@ -61,16 +90,16 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                 .build();
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
-    private org.springframework.core.env.Environment env;
+    @Autowired
+    private Environment env;
 
     @Override
     public void run(String... args) throws Exception {
-        if (java.util.Arrays.asList(env.getActiveProfiles()).contains("test")) {
+        if (Arrays.asList(env.getActiveProfiles()).contains("test")) {
             return;
         }
 
-        if (java.util.Arrays.asList(args).contains("--mcp-server")) {
+        if (Arrays.asList(args).contains("--mcp-server")) {
             System.err.println("[SYSTEM] Starting Porridge in MCP Server mode over stdio...");
             startMcpServer();
             return;
@@ -116,11 +145,13 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
 
             String systemConstraints = workspaceLoader.gatherSkillsContext();
             String evaluationContext = "### Local Workspace Constraints:\n" + systemConstraints + "\n\n";
+            evaluationContext += "### Artifacts & Plans Directory:\nWhen asked to generate plans, reports, or persistent artifacts, save them in the following conversation-specific directory: " + harnessState.getArtifactsDir() + "/" + mainSessionId + ". You must create this directory if it doesn't exist before saving files to it.\n\n";
+
             if (harnessState.isPlanMode()) {
                 evaluationContext += "### CRITICAL INSTRUCTION:\nYou are in PLAN MODE. You must ONLY output a markdown plan. DO NOT invoke any tools except to view files. DO NOT modify files or run bash commands.\n\n";
             }
             
-            org.springframework.ai.chat.messages.UserMessage userMessage;
+            UserMessage userMessage;
             if (prompt.trim().startsWith("/image ")) {
                 String[] imageParts = prompt.trim().substring(7).trim().split(" ", 2);
                 if (imageParts.length < 2) {
@@ -128,16 +159,16 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                     continue;
                 }
                 try {
-                    byte[] imgBytes = java.nio.file.Files.readAllBytes(java.nio.file.Path.of(imageParts[0]));
-                    org.springframework.util.MimeType mimeType = imageParts[0].endsWith(".png") ? org.springframework.util.MimeTypeUtils.IMAGE_PNG : org.springframework.util.MimeTypeUtils.IMAGE_JPEG;
-                    org.springframework.ai.model.Media media = new org.springframework.ai.model.Media(mimeType, new org.springframework.core.io.ByteArrayResource(imgBytes));
-                    userMessage = new org.springframework.ai.chat.messages.UserMessage(evaluationContext + "### User Goal:\n" + imageParts[1], java.util.List.of(media));
+                    byte[] imgBytes = Files.readAllBytes(Path.of(imageParts[0]));
+                    MimeType mimeType = imageParts[0].endsWith(".png") ? MimeTypeUtils.IMAGE_PNG : MimeTypeUtils.IMAGE_JPEG;
+                    Media media = new Media(mimeType, new ByteArrayResource(imgBytes));
+                    userMessage = new UserMessage(evaluationContext + "### User Goal:\n" + imageParts[1], List.of(media));
                 } catch (Exception e) {
                     terminal.writer().println("\u001B[31m[SYSTEM] Failed to load image: " + e.getMessage() + "\u001B[0m");
                     continue;
                 }
             } else {
-                userMessage = new org.springframework.ai.chat.messages.UserMessage(evaluationContext + "### User Goal:\n" + prompt);
+                userMessage = new UserMessage(evaluationContext + "### User Goal:\n" + prompt);
             }
 
             // 3. Process instructions through the ReAct engine loop
@@ -166,11 +197,11 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
 
                 try {
                     Process process = new ProcessBuilder("sh", "-c", cliCmd)
-                            .directory(com.agent.harness.config.WorkspaceContext.getBaseDir().toFile())
+                            .directory(WorkspaceContext.getBaseDir().toFile())
                             .redirectErrorStream(true)
                             .start();
                     
-                    java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream()));
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                     StringBuilder output = new StringBuilder();
                     String line;
                     while ((line = reader.readLine()) != null) {
@@ -182,8 +213,8 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                     agentResponse = "[Delegated to " + engine + "]\n" + output.toString();
                     
                     // Manually push to history so Porridge retains the context across turns
-                    memory.add(mainSessionId, java.util.List.of(userMessage));
-                    memory.add(mainSessionId, java.util.List.of(new org.springframework.ai.chat.messages.AssistantMessage(agentResponse)));
+                    memory.add(mainSessionId, List.of(userMessage));
+                    memory.add(mainSessionId, List.of(new AssistantMessage(agentResponse)));
                     
                 } catch (Exception e) {
                     agentResponse = "Execution via " + engine + " failed: " + e.getMessage();
@@ -193,7 +224,7 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                         .messages(userMessage)
                         .advisors(ctx -> ctx.param(MessageChatMemoryAdvisor.CHAT_MEMORY_CONVERSATION_ID_KEY, mainSessionId))
                         .functions("viewFileTool", "editFileTool", "replaceFileTool", "bashCommandTool", "spawnSubagentTool", "grepSearchTool", "fetchUrlTool", "listDirectoryTool", "askHumanTool", "runBackgroundTaskTool", "checkTaskStatusTool", "addMemoryTool", "queryMemoryTool", "deleteMemoryTool", "orchestrateAgentTool")
-                        .functions(mcpTools.toArray(new org.springframework.ai.tool.ToolCallback[0]))
+                        .functions(mcpTools.toArray(new ToolCallback[0]))
                         .call()
                         .content();
             }
@@ -221,9 +252,9 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                     String instructions = lineReader.readLine("Instructions for the agent: ");
                     
                     try {
-                        java.nio.file.Path skillFile = java.nio.file.Path.of(".porridge/skills/" + filename);
-                        if (!java.nio.file.Files.exists(skillFile.getParent())) java.nio.file.Files.createDirectories(skillFile.getParent());
-                        java.nio.file.Files.writeString(skillFile, "### " + name + "\n" + instructions);
+                        Path skillFile = Path.of(".porridge/skills/" + filename);
+                        if (!Files.exists(skillFile.getParent())) Files.createDirectories(skillFile.getParent());
+                        Files.writeString(skillFile, "### " + name + "\n" + instructions);
                         terminal.writer().println("\u001B[32m[SYSTEM] Skill created at " + skillFile.toString() + "\u001B[0m");
                     } catch (Exception e) {
                         terminal.writer().println("\u001B[31m[SYSTEM] Failed to save skill.\u001B[0m");
@@ -234,9 +265,9 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                     String argsStr = lineReader.readLine("Arguments (space separated, e.g. '-y @modelcontextprotocol/server-postgres'): ");
                     
                     try {
-                        java.nio.file.Path mcpFile = java.nio.file.Path.of("mcp.json");
+                        Path mcpFile = Path.of("mcp.json");
                         String json = "{\n  \"mcpServers\": {\n    \"" + serverName + "\": {\n      \"command\": \"" + execCommand + "\",\n      \"args\": [\"" + argsStr.replace(" ", "\", \"") + "\"]\n    }\n  }\n}";
-                        java.nio.file.Files.writeString(mcpFile, json, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+                        Files.writeString(mcpFile, json, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
                         terminal.writer().println("\u001B[32m[SYSTEM] MCP server appended to mcp.json! Restart harness to apply.\u001B[0m");
                     } catch (Exception e) {
                         terminal.writer().println("\u001B[31m[SYSTEM] Failed to save MCP config.\u001B[0m");
@@ -346,16 +377,16 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
             case "/learn":
                 if (parts.length > 1) {
                     try {
-                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                        java.nio.file.Path memoryFile = java.nio.file.Path.of(".porridge/graph_memory.json");
-                        if (!java.nio.file.Files.exists(memoryFile.getParent()) && memoryFile.getParent() != null) {
-                            java.nio.file.Files.createDirectories(memoryFile.getParent());
+                        ObjectMapper mapper = new ObjectMapper();
+                        Path memoryFile = Path.of(".porridge/graph_memory.json");
+                        if (!Files.exists(memoryFile.getParent()) && memoryFile.getParent() != null) {
+                            Files.createDirectories(memoryFile.getParent());
                         }
-                        java.util.Map<String, java.util.List<String>> memory = new java.util.HashMap<>();
-                        if (java.nio.file.Files.exists(memoryFile)) {
-                            memory = mapper.readValue(memoryFile.toFile(), java.util.Map.class);
+                        Map<String, List<String>> memory = new HashMap<>();
+                        if (Files.exists(memoryFile)) {
+                            memory = mapper.readValue(memoryFile.toFile(), Map.class);
                         }
-                        memory.putIfAbsent("global", new java.util.ArrayList<>());
+                        memory.putIfAbsent("global", new ArrayList<>());
                         memory.get("global").add(parts[1].trim());
                         mapper.writeValue(memoryFile.toFile(), memory);
                         
@@ -370,12 +401,12 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
             case "/unlearn":
                 if (parts.length > 1) {
                     try {
-                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                        java.nio.file.Path memoryFile = java.nio.file.Path.of(".porridge/graph_memory.json");
-                        if (java.nio.file.Files.exists(memoryFile)) {
-                            java.util.Map<String, java.util.List<String>> memory = mapper.readValue(memoryFile.toFile(), java.util.Map.class);
+                        ObjectMapper mapper = new ObjectMapper();
+                        Path memoryFile = Path.of(".porridge/graph_memory.json");
+                        if (Files.exists(memoryFile)) {
+                            Map<String, List<String>> memory = mapper.readValue(memoryFile.toFile(), Map.class);
                             boolean removed = false;
-                            for (java.util.List<String> obs : memory.values()) {
+                            for (List<String> obs : memory.values()) {
                                 if (obs.removeIf(o -> o.contains(parts[1].trim()))) removed = true;
                             }
                             mapper.writeValue(memoryFile.toFile(), memory);
@@ -393,9 +424,9 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                 terminal.writer().println("\u001B[33m[SYSTEM] Manual memory compaction triggered...\u001B[0m");
                 String instruction = parts.length > 1 ? parts[1].trim() : "Summarize the key architectural decisions, facts, and goals from this conversation history.";
                 
-                java.util.List<org.springframework.ai.chat.messages.Message> history = memory.get("main-session", 100);
+                List<Message> history = memory.get("main-session", 100);
                 StringBuilder historyText = new StringBuilder();
-                for (org.springframework.ai.chat.messages.Message msg : history) {
+                for (Message msg : history) {
                     historyText.append(msg.getMessageType()).append(": ").append(msg.getText()).append("\n");
                 }
                 
@@ -405,7 +436,7 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                     .content();
                     
                 memory.clear("main-session");
-                memory.add("main-session", java.util.List.of(new org.springframework.ai.chat.messages.SystemMessage("Previous Session Summary: " + summary)));
+                memory.add("main-session", List.of(new SystemMessage("Previous Session Summary: " + summary)));
                 terminal.writer().println("\u001B[32m[SYSTEM] Memory compacted. New context established.\u001B[0m");
                 terminal.writer().println("\nSummary:\n" + summary);
                 break;
@@ -437,7 +468,7 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                             String response = subagentManager.spawnSubagent(prompt, role, sandbox);
                             
                             return new McpSchema.CallToolResult(
-                                java.util.List.of(new McpSchema.TextContent(response)), 
+                                List.of(new McpSchema.TextContent(response)), 
                                 false
                             );
                         }
