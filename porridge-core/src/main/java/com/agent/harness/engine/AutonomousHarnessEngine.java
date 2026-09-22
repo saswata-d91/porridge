@@ -151,38 +151,40 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                 evaluationContext += "### CRITICAL INSTRUCTION:\nYou are in PLAN MODE. You must ONLY output a markdown plan. DO NOT invoke any tools except to view files. DO NOT modify files or run bash commands.\n\n";
             }
             
-            UserMessage userMessage;
-            if (prompt.trim().startsWith("/image ") || prompt.trim().startsWith("/media ")) {
-                String cmd = prompt.trim().startsWith("/image ") ? "/image " : "/media ";
-                String[] mediaParts = prompt.trim().substring(cmd.length()).trim().split(" ", 2);
-                if (mediaParts.length < 2) {
-                    terminal.writer().println("\u001B[31m[SYSTEM] Usage: " + cmd + "<path> <prompt>\u001B[0m");
-                    continue;
-                }
+            List<Media> mediaAttachments = new ArrayList<>();
+            String[] tokens = prompt.split("\\s+");
+            for (String token : tokens) {
                 try {
-                    String filePath = mediaParts[0];
-                    byte[] fileBytes = Files.readAllBytes(Path.of(filePath));
-                    
-                    String mimeStr = "application/octet-stream";
-                    String lowerPath = filePath.toLowerCase();
-                    if (lowerPath.endsWith(".png")) mimeStr = "image/png";
-                    else if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg")) mimeStr = "image/jpeg";
-                    else if (lowerPath.endsWith(".gif")) mimeStr = "image/gif";
-                    else if (lowerPath.endsWith(".webp")) mimeStr = "image/webp";
-                    else if (lowerPath.endsWith(".mp4")) mimeStr = "video/mp4";
-                    else if (lowerPath.endsWith(".mpeg")) mimeStr = "video/mpeg";
-                    else if (lowerPath.endsWith(".mov")) mimeStr = "video/quicktime";
-                    else if (lowerPath.endsWith(".mp3")) mimeStr = "audio/mpeg";
-                    else if (lowerPath.endsWith(".wav")) mimeStr = "audio/wav";
-                    else if (lowerPath.endsWith(".ogg")) mimeStr = "audio/ogg";
-                    
-                    MimeType mimeType = MimeType.valueOf(mimeStr);
-                    Media media = new Media(mimeType, new ByteArrayResource(fileBytes));
-                    userMessage = new UserMessage(evaluationContext + "### User Goal:\n" + mediaParts[1], List.of(media));
+                    Path p = Path.of(token);
+                    if (Files.exists(p) && !Files.isDirectory(p)) {
+                        String lowerPath = token.toLowerCase();
+                        String mimeStr = null;
+                        if (lowerPath.endsWith(".png")) mimeStr = "image/png";
+                        else if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg")) mimeStr = "image/jpeg";
+                        else if (lowerPath.endsWith(".gif")) mimeStr = "image/gif";
+                        else if (lowerPath.endsWith(".webp")) mimeStr = "image/webp";
+                        else if (lowerPath.endsWith(".mp4")) mimeStr = "video/mp4";
+                        else if (lowerPath.endsWith(".mpeg")) mimeStr = "video/mpeg";
+                        else if (lowerPath.endsWith(".mov")) mimeStr = "video/quicktime";
+                        else if (lowerPath.endsWith(".mp3")) mimeStr = "audio/mpeg";
+                        else if (lowerPath.endsWith(".wav")) mimeStr = "audio/wav";
+                        else if (lowerPath.endsWith(".ogg")) mimeStr = "audio/ogg";
+                        
+                        if (mimeStr != null) {
+                            byte[] fileBytes = Files.readAllBytes(p);
+                            MimeType mimeType = MimeType.valueOf(mimeStr);
+                            mediaAttachments.add(new Media(mimeType, new ByteArrayResource(fileBytes)));
+                            terminal.writer().println("\u001B[32m[SYSTEM] Auto-attached media: " + token + "\u001B[0m");
+                        }
+                    }
                 } catch (Exception e) {
-                    terminal.writer().println("\u001B[31m[SYSTEM] Failed to load media: " + e.getMessage() + "\u001B[0m");
-                    continue;
+                    // Ignore, not a valid path or couldn't read
                 }
+            }
+            
+            UserMessage userMessage;
+            if (!mediaAttachments.isEmpty()) {
+                userMessage = new UserMessage(evaluationContext + "### User Goal:\n" + prompt, mediaAttachments);
             } else {
                 userMessage = new UserMessage(evaluationContext + "### User Goal:\n" + prompt);
             }

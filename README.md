@@ -46,8 +46,8 @@ Simply type `/engine agy` in the REPL, and Porridge will securely pipe prompts t
 Porridge treats files and binary data as first-class citizens:
 
 ### 1. Native Image, Audio, and Video Parsing
-You can stream binary media directly into the LLM context window using the `/media` (or `/image`) slash command. If your underlying model supports it (like Gemini 1.5 Pro), Porridge will wrap the binary in a Spring AI `Media` payload, allowing the model to natively "watch", "listen", or "see" the file.
-**Usage:** `/media path/to/recording.mp4 Summarize this meeting.`
+You can stream binary media directly into the LLM context window simply by referencing their file paths in your prompt! Porridge acts like Claude Code and will automatically detect any valid file paths (absolute or relative) typed into the REPL. If the file is an image, audio, or video, and your model supports it (like Gemini 1.5 Pro), Porridge automatically bundles the binary into a native Spring AI `Media` payload.
+**Usage:** `Summarize this meeting: path/to/recording.mp4`
 **Supported Formats:** `.png`, `.jpg`, `.mp4`, `.mp3`, `.wav`, etc.
 
 ### 2. Deep Document Parsing (Apache Tika)
