@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.function.Function;
 
 @Configuration
-public class ReadDocumentTool {
+public class ReadDocumentToolConfig {
 
     public record ReadDocRequest(String path) {}
 

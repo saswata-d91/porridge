@@ -6,6 +6,7 @@ import com.agent.harness.tools.McpConnectionManager;
 import com.agent.harness.config.HarnessState;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 import com.agent.harness.memory.ContextPersistenceManager;
 import org.springframework.ai.chat.client.ChatClient;
@@ -32,13 +33,19 @@ public class SubagentManager {
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     public SubagentManager(
-            ChatClient.Builder clientBuilder,
+            Optional<ChatClient.Builder> clientBuilderOpt,
             MessageChatMemoryAdvisor memoryAdvisor,
             InMemoryChatMemory memory,
             ContextPersistenceManager persistenceManager,
             DynamicWorkspaceLoader workspaceLoader,
             McpConnectionManager mcpManager, HarnessState harnessState) {
-        this.chatClient = clientBuilder.defaultAdvisors(memoryAdvisor).build();
+                if (clientBuilderOpt.isPresent()) {
+            this.chatClient = clientBuilderOpt.get()
+                    .defaultAdvisors(memoryAdvisor)
+                    .build();
+        } else {
+            this.chatClient = null;
+        }
         this.memory = memory;
         this.persistenceManager = persistenceManager;
         this.workspaceLoader = workspaceLoader;

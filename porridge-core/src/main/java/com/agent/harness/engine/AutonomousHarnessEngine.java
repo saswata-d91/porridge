@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -59,7 +60,7 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
     private List<ToolCallback> mcpTools;
 
     public AutonomousHarnessEngine(
-            ChatClient.Builder clientBuilder, 
+            Optional<ChatClient.Builder> clientBuilderOpt, 
             MessageChatMemoryAdvisor memoryAdvisor,
             InMemoryChatMemory memory,
             ContextPersistenceManager persistenceManager,
@@ -77,15 +78,22 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
         
         System.out.println("[AGENT] Initializing MCP connections...");
         this.mcpTools = mcpManager.loadMcpTools();
-        this.chatClient = clientBuilder
-                .defaultAdvisors(memoryAdvisor)
-                .defaultSystem("""
-                    You are Porridge, an elite terminal automation engineer.
-                    You have read access to codebase files and execution abilities via tools.
-                    When solving coding problems, you must locate files, make edits, and run commands 
-                    to compile and test your changes before claiming the issue is solved.
-                    """)
-                .build();
+                if (clientBuilderOpt.isPresent()) {
+            this.chatClient = clientBuilderOpt.get()
+                    .defaultAdvisors(memoryAdvisor)
+                    .defaultSystem("""
+                        You are Porridge, an elite terminal automation engineer.
+                        You have read access to codebase files and execution abilities via tools.
+                        When solving coding problems, you must locate files, make edits, and run commands 
+                        autonomously until the task is complete. Always verify your work.
+                        
+                        When asked to generate plans, reports, or persistent artifacts, save them in the following conversation-specific directory: .porridge/conversations/{sessionId}.
+                        """)
+                    .build();
+        } else {
+            System.out.println("\n\u001B[33m[SYSTEM] No API keys detected (No ChatModel configured). Native execution disabled. You must use /engine to run an external CLI.\u001B[0m\n");
+            this.chatClient = null;
+        }
     }
 
     @Autowired
@@ -236,6 +244,10 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                     agentResponse = "Execution via " + engine + " failed: " + e.getMessage();
                 }
             } else {
+                if (this.chatClient == null) {
+                    terminal.writer().println("\u001B[31m[SYSTEM] Native execution disabled due to missing API keys. Please type '/engine agy' or '/engine claude-code' to use external engines.\u001B[0m");
+                    continue;
+                }
                 agentResponse = this.chatClient.prompt()
                         .messages(userMessage)
                         .advisors(ctx -> ctx.param(MessageChatMemoryAdvisor.CHAT_MEMORY_CONVERSATION_ID_KEY, mainSessionId))
