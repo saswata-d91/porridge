@@ -39,7 +39,7 @@ public class ExternalAgentOrchestratorTool {
                         break;
                     case "gh":
                     case "github":
-                        cmd = "gh copilot suggest -t shell \"" + req.prompt().replace("\"", "\\\"") + "\"";
+                        cmd = "gh copilot -p \"" + req.prompt().replace("\"", "\\\"") + "\"";
                         break;
                     default:
                         return "Error: Unknown agent type. Use 'agy', 'claude', 'codex', 'auggie', or 'gh'.";
