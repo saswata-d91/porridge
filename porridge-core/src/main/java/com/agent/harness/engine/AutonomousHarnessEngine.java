@@ -206,6 +206,9 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                 
                 if (engine.equalsIgnoreCase("agy")) {
                     cliCmd = "agy --print \"" + prompt.replace("\"", "\\\"") + "\"" + (!extModel.equals("default") ? " --model " + extModel : "");
+                    if (harnessState.isDangerouslySkipPermissions()) {
+                        cliCmd += " --dangerously-skip-permissions";
+                    }
                 } else if (engine.equalsIgnoreCase("claude-code") || engine.equalsIgnoreCase("claude")) {
                     // Claude Code accepts model via environment variables usually, but we can try --model if they ever add it, or just pass nothing.
                     cliCmd = "claude -p \"" + prompt.replace("\"", "\\\"") + "\"" + (!extModel.equals("default") ? " -m " + extModel : "");
