@@ -1,6 +1,17 @@
 #!/bin/bash
 set -e
 
+FORCE_BUILD=false
+ARGS=()
+
+for arg in "$@"; do
+    if [ "$arg" = "--build" ]; then
+        FORCE_BUILD=true
+    else
+        ARGS+=("$arg")
+    fi
+done
+
 # Version requirements
 REQUIRED_JAVA_VERSION=17
 JRE_DIR="$HOME/.porridge/jre"
@@ -54,7 +65,7 @@ fi
 # 2. Check JAR
 JAR_FILE="porridge-core/target/claude-code-java-harness-0.0.1-SNAPSHOT.jar"
 
-if [ ! -f "$JAR_FILE" ]; then
+if [ "$FORCE_BUILD" = true ] || [ ! -f "$JAR_FILE" ]; then
     echo "[SYSTEM] Building Porridge..."
     if command -v mvn >/dev/null 2>&1; then
         mvn clean package -DskipTests
@@ -65,4 +76,4 @@ if [ ! -f "$JAR_FILE" ]; then
 fi
 
 # 3. Execute
-exec "$JAVA_CMD" -jar "$JAR_FILE" "$@"
+exec "$JAVA_CMD" -jar "$JAR_FILE" "${ARGS[@]}"

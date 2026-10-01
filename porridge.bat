@@ -1,6 +1,20 @@
 @echo off
 setlocal enabledelayedexpansion
 
+set FORCE_BUILD=false
+set ARGS=
+
+:parse_args
+if "%~1"=="" goto done_args
+if "%~1"=="--build" (
+    set FORCE_BUILD=true
+) else (
+    set ARGS=!ARGS! %1
+)
+shift
+goto parse_args
+:done_args
+
 set REQUIRED_JAVA_VERSION=17
 set JRE_DIR=%USERPROFILE%\.porridge\jre
 set JAVA_CMD=java
@@ -53,7 +67,15 @@ goto :run_jar
 :run_jar
 set JAR_FILE=porridge-core\target\claude-code-java-harness-0.0.1-SNAPSHOT.jar
 
-if not exist "%JAR_FILE%" (
+if "!FORCE_BUILD!"=="true" (
+    set DO_BUILD=1
+) else if not exist "%JAR_FILE%" (
+    set DO_BUILD=1
+) else (
+    set DO_BUILD=0
+)
+
+if "!DO_BUILD!"=="1" (
     echo [SYSTEM] Building Porridge...
     call mvn clean package -DskipTests
     if %errorlevel% neq 0 (
@@ -62,4 +84,4 @@ if not exist "%JAR_FILE%" (
     )
 )
 
-"%JAVA_CMD%" -jar "%JAR_FILE%" %*
+"%JAVA_CMD%" -jar "%JAR_FILE%" !ARGS!
