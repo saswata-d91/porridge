@@ -220,6 +220,13 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                 }
 
                 try {
+                    
+                    String osName = System.getProperty("os.name").toLowerCase();
+                    if (osName.contains("mac")) {
+                        cliCmd = "script -q /dev/null " + cliCmd;
+                    } else if (osName.contains("linux")) {
+                        cliCmd = "script -q /dev/null -c \"" + cliCmd.replace("\"", "\\\"") + "\"";
+                    }
                     Process process = new ProcessBuilder("sh", "-c", cliCmd)
                             .directory(WorkspaceContext.getBaseDir().toFile())
                             .redirectErrorStream(true)

@@ -51,6 +51,13 @@ public class ExternalAgentOrchestratorTool {
 
                 System.out.println("\n\u001B[33m[ORCHESTRATOR] Delegating task to " + req.agentType() + "...\u001B[0m");
 
+                
+                String osName = System.getProperty("os.name").toLowerCase();
+                if (osName.contains("mac")) {
+                    cmd = "script -q /dev/null " + cmd;
+                } else if (osName.contains("linux")) {
+                    cmd = "script -q /dev/null -c \"" + cmd.replace("\"", "\\\"") + "\"";
+                }
                 Process process = new ProcessBuilder("sh", "-c", cmd)
                         .directory(dir.toFile())
                         .redirectErrorStream(true)
