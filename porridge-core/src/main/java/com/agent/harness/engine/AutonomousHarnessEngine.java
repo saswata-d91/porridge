@@ -375,26 +375,59 @@ public class AutonomousHarnessEngine implements CommandLineRunner {
                     String newModel = harnessState.getCurrentModel();
                     
                     if (harnessState.getExecutionEngine().equalsIgnoreCase("agy")) {
-                        terminal.writer().println("1) default");
-                        terminal.writer().println("2) gemini-3.1-pro");
-                        terminal.writer().println("3) gemini-3.95-flash");
-                        terminal.writer().println("4) gemini-3.7-flash");
-                        terminal.writer().println("5) gemini-3.8-flash");
-                        terminal.writer().println("6) gpt-oss");
-                        terminal.writer().println("7) claude-sonnet");
-                        terminal.writer().println("8) Custom / Manual Entry");
+                        terminal.writer().println("\u001B[33mFetching live models from agy...\u001B[0m");
                         terminal.writer().flush();
                         
-                        String modelChoice = lineReader.readLine("\u001B[32mSelect model (1-8) [Current: " + harnessState.getCurrentModel() + "]: \u001B[0m");
-                        switch (modelChoice.trim()) {
-                            case "1": newModel = "default"; break;
-                            case "2": newModel = "gemini-3.1-pro"; break;
-                            case "3": newModel = "gemini-3.95-flash"; break;
-                            case "4": newModel = "gemini-3.7-flash"; break;
-                            case "5": newModel = "gemini-3.8-flash"; break;
-                            case "6": newModel = "gpt-oss"; break;
-                            case "7": newModel = "claude-sonnet"; break;
-                            case "8": newModel = lineReader.readLine("\u001B[32mEnter custom model name: \u001B[0m").trim(); break;
+                        java.util.List<String> liveModels = new java.util.ArrayList<>();
+                        liveModels.add("default");
+                        
+                        try {
+                            String osName = System.getProperty("os.name").toLowerCase();
+                            String modelsCmd = osName.contains("mac") ? "script -q /dev/null agy models" : "script -q /dev/null -c 'agy models'";
+                            Process process = new ProcessBuilder("sh", "-c", modelsCmd).start();
+                            java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream()));
+                            
+                            StringBuilder outBuilder = new StringBuilder();
+                            int c;
+                            while ((c = reader.read()) != -1) {
+                                outBuilder.append((char) c);
+                            }
+                            process.waitFor();
+                            
+                            String[] lines = outBuilder.toString().split("\\r?\\n|\\r");
+                            for (String l : lines) {
+                                l = l.replaceAll("\\u001B\\[[;\\d]*m", "").trim();
+                                l = l.replaceAll("^.*?Fetching available models\\.\\.\\.", "").trim();
+                                if (l.isEmpty()) continue;
+                                
+                                String[] chunks = l.split("\\s+");
+                                String first = chunks[0];
+                                if (first.length() > 5 && first.contains("-") && (first.startsWith("gemini") || first.startsWith("claude") || first.startsWith("gpt") || first.startsWith("auggie"))) {
+                                    if (!liveModels.contains(first)) {
+                                        liveModels.add(first);
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            terminal.writer().println("Failed to fetch live models: " + e.getMessage());
+                        }
+                        
+                        for (int i=0; i<liveModels.size(); i++) {
+                            terminal.writer().println((i+1) + ") " + liveModels.get(i));
+                        }
+                        terminal.writer().println((liveModels.size() + 1) + ") Custom / Manual Entry");
+                        terminal.writer().flush();
+                        
+                        String modelChoice = lineReader.readLine("\u001B[32mSelect model (1-" + (liveModels.size()+1) + ") [Current: " + harnessState.getCurrentModel() + "]: \u001B[0m");
+                        int choiceIndex = -1;
+                        try {
+                            choiceIndex = Integer.parseInt(modelChoice.trim()) - 1;
+                        } catch (NumberFormatException ignored) {}
+                        
+                        if (choiceIndex >= 0 && choiceIndex < liveModels.size()) {
+                            newModel = liveModels.get(choiceIndex);
+                        } else if (choiceIndex == liveModels.size()) {
+                            newModel = lineReader.readLine("\u001B[32mEnter custom model name: \u001B[0m").trim();
                         }
                     } else {
                         terminal.writer().println("1) default (Engine's default)");
